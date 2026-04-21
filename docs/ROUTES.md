@@ -1,70 +1,88 @@
-# 路由設計文件 (API Design)
+# 路由設計文件 (Routes Design)
 
-## 1. 路由總覽列表
-| 功能 | HTTP 方法 | URL 路徑 | 對應模板 | 說明 |
+本文件依據 `ARCHITECTURE.md` 中定義的 Flask + Jinja2 伺服器端渲染架構進行規劃，確保每個功能的 URL、HTTP 方法與對應模板都符合標準的網頁互動流程。
+
+## 1. 路由總覽表格
+
+| 功能 | HTTP 方法 | URL 路徑 | 對應模板 / 重導向 | 說明 |
 | --- | --- | --- | --- | --- |
-| 食譜列表 (首頁) | `GET` | `/` | `templates/recipes/index.html` | 顯示所有食譜，支援 `?q=` 查詢參數進行名稱/食材搜尋。 |
-| 新增食譜頁面 | `GET` | `/recipes/new` | `templates/recipes/form.html` | 顯示空白的新增食譜表單。 |
-| 建立食譜 | `POST` | `/recipes` | — | 接收表單資料、存入 DB，成功後重導回首頁。 |
-| 食譜明細 | `GET` | `/recipes/<int:id>` | `templates/recipes/show.html` | 顯示特定食譜的食材與步驟。若查無資料回傳 404。 |
-| 編輯食譜頁面 | `GET` | `/recipes/<int:id>/edit` | `templates/recipes/form.html` | 顯示現有食譜資料供修改。 |
-| 更新食譜 | `POST` | `/recipes/<int:id>/update` | — | 接收更新表單並寫回 DB，完成後重導至食譜明細。 |
-| 刪除食譜 | `POST` | `/recipes/<int:id>/delete` | — | 從 DB 中刪除該筆資料，完成後重導回首頁。 |
+| 首頁 / 活動列表 | GET | `/` 或 `/events` | `templates/events/index.html` | 顯示所有公開活動 |
+| 登入頁面 | GET | `/auth/login` | `templates/auth/login.html` | 顯示登入表單 |
+| 執行登入 | POST | `/auth/login` | 重導向至 `/` | 驗證帳號密碼，寫入 Session |
+| 登出 | GET/POST | `/auth/logout` | 重導向至 `/` | 清除 Session |
+| 註冊頁面 | GET | `/auth/register` | `templates/auth/register.html` | 顯示註冊表單 |
+| 執行註冊 | POST | `/auth/register` | 重導向至 `/auth/login` | 建立新使用者帳號 |
+| 活動詳情 | GET | `/events/<id>` | `templates/events/detail.html` | 顯示單筆活動與目前報名狀況 |
+| 新增活動頁面 | GET | `/admin/events/new` | `templates/events/form.html` | 管理員：顯示新增表單 |
+| 建立活動 | POST | `/admin/events` | 重導向至 `/events/<id>` | 管理員：接收表單並寫入 DB |
+| 編輯活動頁面 | GET | `/admin/events/<id>/edit`| `templates/events/form.html` | 管理員：顯示編輯表單 |
+| 更新活動 | POST | `/admin/events/<id>/update`| 重導向至 `/events/<id>` | 管理員：更新 DB 中的活動 |
+| 刪除活動 | POST | `/admin/events/<id>/delete`| 重導向至 `/` | 管理員：刪除活動 |
+| 執行報名 | POST | `/events/<id>/register` | 重導向至 `/registrations` | 學生：觸發悲觀鎖，執行報名 |
+| 我的報名清單 | GET | `/registrations` | `templates/registrations/index.html` | 學生：檢視自己報名成功的活動 |
+| 檢視活動報名名單| GET | `/admin/events/<id>/registrations`| `templates/registrations/list.html` | 管理員：檢視特定活動的報名名單 |
 
 ---
 
 ## 2. 路由詳細說明
 
-### `GET /` (食譜列表)
-- **輸入**: URL 查詢參數 `?q=keyword` (可選)
-- **處理邏輯**: 
-  - 若有 `q` 則呼叫 `Recipe.get_all(q)` 並搜尋。
-  - 若無則呼叫 `Recipe.get_all()` 取得最新食譜清單。
-- **輸出**: 渲染 `recipes/index.html`，傳入食譜列表變數 `recipes`。
-- **錯誤處理**: 資料庫如讀取錯誤報 500。
+### Auth 路由 (`app/routes/auth.py`)
 
-### `GET /recipes/new` (新增輸入頁面)
-- **輸入**: 無
-- **處理邏輯**: 準備畫面即可。
-- **輸出**: 渲染 `recipes/form.html`。
-- **錯誤處理**: 無特殊錯誤。
+*   **`GET /auth/login`**
+    *   **輸出**：渲染 `auth/login.html`。
+*   **`POST /auth/login`**
+    *   **輸入**：表單欄位 `username`, `password`。
+    *   **邏輯**：查詢 `User` 模型，比對密碼。成功則將 `user_id` 存入 session。
+    *   **錯誤處理**：若失敗，利用 `flash()` 顯示錯誤並重新渲染 `auth/login.html`。
+*   **`GET /auth/register`**
+    *   **輸出**：渲染 `auth/register.html`。
+*   **`POST /auth/register`**
+    *   **輸入**：表單欄位 `username`, `password`, `email`。
+    *   **邏輯**：建立新 `User` (預設角色為 student)。
+    *   **錯誤處理**：帳號或信箱重複時，`flash()` 顯示錯誤並重繪表單。
 
-### `POST /recipes` (建立食譜)
-- **輸入**: Form Data 包含 `title`, `description`, `ingredients`, `steps`。
-- **處理邏輯**: 接收 Form，呼叫 `Recipe.create(data)`。
-- **輸出**: Http 302 重新導向至 `/` (首頁)。
-- **錯誤處理**: 若 `title`, `ingredients`, `steps` 等必填欄位缺失，透過 Flash Message 提示並導回 `/recipes/new`。
+### Event 路由 (`app/routes/event.py`)
 
-### `GET /recipes/<int:id>` (食譜明細)
-- **輸入**: URL 參數 `id`。
-- **處理邏輯**: 呼叫 `Recipe.get_by_id(id)` 取得指定食譜。
-- **輸出**: 渲染 `recipes/show.html`，傳入 `recipe`。
-- **錯誤處理**: 若 `recipe` 為空 (None)，拋出 HTTP 404 (Not Found)。
+*   **`GET /events`**
+    *   **邏輯**：呼叫 `Event.get_all()`。
+    *   **輸出**：將活動列表傳入 `events/index.html` 渲染。
+*   **`GET /events/<id>`**
+    *   **邏輯**：呼叫 `Event.get_by_id(id)`。
+    *   **輸出**：渲染 `events/detail.html`。找不到則回傳 404 頁面。
+*   **`GET /admin/events/new`**
+    *   **邏輯**：檢查管理員權限。
+    *   **輸出**：渲染 `events/form.html` (表單為空)。
+*   **`POST /admin/events`**
+    *   **輸入**：表單 `title`, `description`, `max_capacity`, `start_time`, `end_time`。
+    *   **邏輯**：檢查管理員權限，呼叫 `Event.create()`。
+*   **`POST /admin/events/<id>/update`**
+    *   **邏輯**：使用 POST 更新活動資料。
+*   **`POST /admin/events/<id>/delete`**
+    *   **邏輯**：從 DB 刪除活動並重導向回首頁。
 
-### `GET /recipes/<int:id>/edit` (編輯食譜頁面)
-- **輸入**: URL 參數 `id`。
-- **處理邏輯**: 呼叫 `Recipe.get_by_id(id)` 取得指定食譜。
-- **輸出**: 渲染 `recipes/form.html`，傳入 `recipe` 將現有值帶入欄位。
-- **錯誤處理**: 若查無結果，拋出 404。
+### Registration 路由 (`app/routes/registration.py`)
 
-### `POST /recipes/<int:id>/update` (更新食譜)
-- **輸入**: URL 參數 `id` 與被更新的表單資料。
-- **處理邏輯**: 呼叫 `Recipe.update(id, data)`。
-- **輸出**: 更新成功後重新導向回詳細頁面 `/recipes/<id>`。
-- **錯誤處理**: 查無食譜 (404) 或欄位缺失等驗證同建立食譜的處理方式。
-
-### `POST /recipes/<int:id>/delete` (刪除食譜)
-- **輸入**: URL 參數 `id`。
-- **處理邏輯**: 呼叫 `Recipe.delete(id)` 進行刪除。
-- **輸出**: 刪除成功後重新導向至 `/`。
-- **錯誤處理**: 若查無食譜則拋出 404。
+*   **`POST /events/<id>/register`**
+    *   **邏輯**：檢查學生登入狀態。呼叫 `Event.register_with_lock(id)` 進行防超賣報名，接著建立 `Registration` 紀錄。
+    *   **錯誤處理**：若捕捉到額滿例外，`flash()` 提示已額滿並重導回活動頁面。
+*   **`GET /registrations`**
+    *   **邏輯**：依據 session 中的 `user_id` 呼叫 `Registration.get_by_user()`。
+    *   **輸出**：渲染 `registrations/index.html`。
+*   **`GET /admin/events/<id>/registrations`**
+    *   **邏輯**：檢查管理員權限。取得該活動的所有報名紀錄與對應使用者資訊。
+    *   **輸出**：渲染 `registrations/list.html`。
 
 ---
 
 ## 3. Jinja2 模板清單
 
-以下檔案後續將於 `app/templates` 建立：
-1. `base.html`: 包含全站共用的 `<head>`、導覽列與外觀樣式。
-2. `recipes/index.html`: 繼承 `base.html`，以卡片或列表結構呈現食譜總覽。
-3. `recipes/show.html`: 繼承 `base.html`，全版詳細呈現食材清單與步驟說明。
-4. `recipes/form.html`: 繼承 `base.html`，一個頁面同時支援新增 (Create) 與編輯 (Update)。依據後端是否丟出已存在的 `recipe` 來判斷是 POST 到 `/recipes` 或 `/recipes/<id>/update`。
+所有模板預設繼承 `templates/base.html`，以共用導覽列 (Navbar) 與 Flash 訊息區塊。
+
+*   `templates/base.html`：全局框架。
+*   `templates/auth/login.html`：登入表單。
+*   `templates/auth/register.html`：註冊表單。
+*   `templates/events/index.html`：首頁/活動列表卡片視圖。
+*   `templates/events/detail.html`：活動詳細資訊與報名按鈕。
+*   `templates/events/form.html`：新增/編輯共用表單。
+*   `templates/registrations/index.html`：學生的個人報名紀錄清單。
+*   `templates/registrations/list.html`：管理員檢視單一活動的報名人員清單。
