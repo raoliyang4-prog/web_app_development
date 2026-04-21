@@ -1,57 +1,83 @@
-# DB Design Document — 資料庫設計文件
+# 資料庫設計文件 (DB Design)
 
-## 1. ER 圖
+本文件根據 `PRD.md` 與 `ARCHITECTURE.md` 產出，定義了活動報名系統的核心資料表結構，並針對 PostgreSQL 進行最佳化，確保能支援高併發的行級鎖 (Row-level Lock)。
+
+## 1. 實體關係圖 (ER Diagram)
+
+以下為本系統核心資料表的實體關聯圖，主要分為使用者 (`users`)、活動 (`events`) 以及報名紀錄 (`registrations`)。
 
 ```mermaid
 erDiagram
-  RECIPES {
-    INTEGER id PK
-    TEXT title "食譜名稱"
-    TEXT description "簡介"
-    TEXT ingredients "所需食材"
-    TEXT steps "烹飪步驟"
-    TEXT created_at "建立時間"
-    TEXT updated_at "最後更新時間"
-  }
+    users ||--o{ events : "creates"
+    users ||--o{ registrations : "makes"
+    events ||--o{ registrations : "has"
+
+    users {
+        int id PK
+        string role
+        string username
+        string password_hash
+        string email
+        datetime created_at
+    }
+
+    events {
+        int id PK
+        string title
+        string description
+        int max_capacity
+        int current_capacity
+        datetime start_time
+        datetime end_time
+        int created_by FK
+        datetime created_at
+    }
+
+    registrations {
+        int id PK
+        int event_id FK
+        int user_id FK
+        string status
+        datetime created_at
+    }
 ```
 
 ## 2. 資料表詳細說明
 
-### `recipes` 資料表
-本系統採用單一資料表設計以符合 MVP 需求，各欄位詳細定義如下：
+### 2.1 `users` 資料表
+用於存放系統的所有使用者，包含學生與管理者。
 
 | 欄位名稱 | 型別 | 必填 | 說明 |
 | --- | --- | --- | --- |
-| `id` | `INTEGER` | 是 | Primary Key, 自動遞增 (AUTOINCREMENT)。 |
-| `title` | `TEXT` | 是 | 食譜名稱。 |
-| `description` | `TEXT` | 否 | 食譜的簡單介紹。 |
-| `ingredients` | `TEXT` | 是 | 食譜的所需食材，為求簡便與彈性，儲存為純文字 (可依照換行或逗點分隔)。未來依食材推薦將利用 `LIKE` 查詢運算實作。 |
-| `steps` | `TEXT` | 是 | 烹飪步驟，儲存為純文字即可。 |
-| `created_at` | `TEXT` | 是 | 建立時間，使用 `CURRENT_TIMESTAMP` 的 ISO 格式儲存。 |
-| `updated_at` | `TEXT` | 是 | 最後更新時間，編輯資料時觸發更新。 |
+| `id` | SERIAL (INT) | Y | Primary Key, 自動遞增 |
+| `role` | VARCHAR(50) | Y | 角色 (`student` 或 `admin`) |
+| `username` | VARCHAR(100) | Y | 登入帳號，需唯一 |
+| `password_hash` | VARCHAR(255) | Y | 密碼雜湊值 |
+| `email` | VARCHAR(255) | Y | 電子信箱，需唯一 |
+| `created_at` | TIMESTAMP | Y | 帳號建立時間 |
 
-## 3. SQL 建表語法
+### 2.2 `events` 資料表
+用於存放活動詳細資訊與報名容量控管。
 
-實作的 SQL 建表存放於 `database/schema.sql` 中：
+| 欄位名稱 | 型別 | 必填 | 說明 |
+| --- | --- | --- | --- |
+| `id` | SERIAL (INT) | Y | Primary Key, 自動遞增 |
+| `title` | VARCHAR(255) | Y | 活動標題 |
+| `description` | TEXT | N | 活動詳細描述 |
+| `max_capacity` | INT | Y | 報名人數上限 |
+| `current_capacity`| INT | Y | 目前已報名人數 (預設 0) |
+| `start_time` | TIMESTAMP | Y | 活動開始時間 |
+| `end_time` | TIMESTAMP | Y | 活動結束時間 |
+| `created_by` | INT | Y | 建立此活動的管理員 ID (FK -> users.id) |
+| `created_at` | TIMESTAMP | Y | 活動建立時間 |
 
-```sql
-CREATE TABLE IF NOT EXISTS recipes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    description TEXT,
-    ingredients TEXT NOT NULL,
-    steps TEXT NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
-```
+### 2.3 `registrations` 資料表
+紀錄學生對特定活動的報名狀態。
 
-## 4. Python Model
-
-封裝的檔案位於 `app/models/recipe.py`。
-使用內建的 `sqlite3` 操作 `instance/database.db`，並支援：
-- `create(data)`
-- `get_all(query=None)`: 實作按標題與食材進行簡單字串 `LIKE` 搜尋。
-- `get_by_id(recipe_id)`
-- `update(recipe_id, data)`
-- `delete(recipe_id)`
+| 欄位名稱 | 型別 | 必填 | 說明 |
+| --- | --- | --- | --- |
+| `id` | SERIAL (INT) | Y | Primary Key, 自動遞增 |
+| `event_id` | INT | Y | 報名的活動 ID (FK -> events.id) |
+| `user_id` | INT | Y | 報名的學生 ID (FK -> users.id) |
+| `status` | VARCHAR(50) | Y | 報名狀態 (`success`, `cancelled`) |
+| `created_at` | TIMESTAMP | Y | 報名時間 |
