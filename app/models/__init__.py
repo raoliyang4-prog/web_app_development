@@ -1,27 +1,33 @@
 """
 app/models/__init__.py
-資料庫連線初始化。
-從環境變數 DATABASE_URL 讀取 PostgreSQL 連線字串。
-"""
-import os
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+SQLite 資料庫連線模組。
 
-DATABASE_URL = os.environ.get(
-    'DATABASE_URL',
-    'postgresql://postgres:password@localhost:5432/event_registration'
+提供 get_db_connection() 供所有 Model 使用，
+設定 row_factory = sqlite3.Row，讓查詢結果可用欄位名稱取值。
+"""
+import sqlite3
+import os
+
+# 資料庫檔案路徑：instance/database.db（相對於專案根目錄）
+DB_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+    'instance',
+    'database.db'
 )
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-Base = declarative_base()
+def get_db_connection():
+    """
+    建立並回傳 SQLite 資料庫連線。
 
+    設定：
+    - row_factory = sqlite3.Row：讓查詢結果可用欄位名稱 (row['column']) 取值
+    - PRAGMA foreign_keys = ON：啟用外鍵約束（SQLite 預設關閉）
 
-def get_db():
-    """產生 SQLAlchemy Session，使用完畢後自動關閉。"""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    使用完畢後，呼叫端需自行呼叫 conn.close()。
+    """
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
