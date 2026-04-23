@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}所有活動 - EventHub{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>最新活動</h2>
+    {% if session.get('role') == 'admin' %}
+        <a href="{{ url_for('event.new_event') }}" class="btn btn-primary">+ 新增活動</a>
+    {% endif %}
+</div>
+
+<div style="margin-bottom: 2rem;">
+    <form method="GET" action="{{ url_for('event.index') }}" style="display: flex; gap: 0.5rem; max-width: 500px;">
+        <input type="text" name="q" class="form-control" placeholder="搜尋活動標題或描述..." value="{{ keyword }}">
+        <button type="submit" class="btn btn-primary">搜尋</button>
+        {% if keyword %}
+            <a href="{{ url_for('event.index') }}" class="btn btn-secondary">清除</a>
+        {% endif %}
+    </form>
+</div>
+
+{% if events %}
+<div class="events-grid">
+    {% for ev in events %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{{ ev.title }}</h3>
+            <div class="card-meta">
+                <span>🕒 {{ ev.start_time }}</span>
+            </div>
+        </div>
+        <div class="card-body">
+            <p class="card-text">{{ ev.description }}</p>
+        </div>
+        <div class="card-footer">
+            {% set available = ev.max_capacity - ev.current_capacity %}
+            {% if available > 0 %}
+                <span class="badge badge-open">剩餘 {{ available }} 名額</span>
+            {% else %}
+                <span class="badge badge-full">已額滿</span>
+            {% endif %}
+            
+            <a href="{{ url_for('event.detail', id=ev.id) }}" class="btn btn-secondary" style="padding: 0.4rem 1rem; font-size: 0.9rem;">查看詳情</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>目前還沒有任何活動</h3>
+    <p>敬請期待即將舉辦的精彩活動！</p>
+</div>
+{% endif %}
+{% endblock %}

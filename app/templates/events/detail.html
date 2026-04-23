@@ -1,1 +1,69 @@
-{# events/detail.html — 將在步驟四實作 #}
+{% extends "base.html" %}
+
+{% block title %}{{ event.title }} - EventHub{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{{ url_for('event.index') }}" class="btn btn-secondary">← 返回活動列表</a>
+    
+    {% if session.get('role') == 'admin' %}
+    <div style="display: flex; gap: 0.5rem;">
+        <a href="{{ url_for('event.edit_event', id=event.id) }}" class="btn btn-secondary">編輯</a>
+        <a href="{{ url_for('registration.event_registrations', id=event.id) }}" class="btn btn-secondary">檢視名單</a>
+        <form method="POST" action="{{ url_for('event.delete_event', id=event.id) }}" onsubmit="return confirm('確定要刪除此活動嗎？這將會同步刪除所有報名紀錄。');" style="display: inline;">
+            <button type="submit" class="btn btn-danger">刪除</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<div class="detail-container">
+    <div class="detail-header">
+        <h1 style="font-size: 2rem; margin-bottom: 0.5rem;">{{ event.title }}</h1>
+        <div class="detail-meta">
+            <div class="meta-item">
+                <span class="meta-label">開始時間</span>
+                <span class="meta-value">{{ event.start_time }}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">結束時間</span>
+                <span class="meta-value">{{ event.end_time }}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">人數狀態</span>
+                <span class="meta-value">{{ event.current_capacity }} / {{ event.max_capacity }} (上限)</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="detail-content">
+        {{ event.description }}
+    </div>
+    
+    <div class="detail-actions">
+        {% set available = event.max_capacity - event.current_capacity %}
+        
+        <div>
+            {% if available > 0 %}
+                <span class="badge badge-open" style="font-size: 1rem; padding: 0.5rem 1rem;">報名開放中 (剩餘 {{ available }} 名額)</span>
+            {% else %}
+                <span class="badge badge-full" style="font-size: 1rem; padding: 0.5rem 1rem;">報名已額滿</span>
+            {% endif %}
+        </div>
+        
+        {% if session.get('user_id') %}
+            {% if session.get('role') == 'student' %}
+                <form method="POST" action="{{ url_for('registration.register_event', id=event.id) }}">
+                    {% if available > 0 %}
+                        <button type="submit" class="btn btn-primary" style="font-size: 1.1rem; padding: 0.8rem 2rem;">立即報名</button>
+                    {% else %}
+                        <button type="button" class="btn btn-secondary" style="font-size: 1.1rem; padding: 0.8rem 2rem;" disabled>已額滿</button>
+                    {% endif %}
+                </form>
+            {% endif %}
+        {% else %}
+            <a href="{{ url_for('auth.login') }}" class="btn btn-primary" style="font-size: 1.1rem; padding: 0.8rem 2rem;">登入後報名</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

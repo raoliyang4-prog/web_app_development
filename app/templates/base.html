@@ -1,1 +1,54 @@
-{# base.html — 將在步驟四實作 #}
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}活動報名系統{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="{{ url_for('event.index') }}" class="navbar-brand">🎯 EventHub</a>
+        <div class="nav-links">
+            <a href="{{ url_for('event.index') }}" class="nav-link">活動列表</a>
+            
+            {% if session.get('user_id') %}
+                <a href="{{ url_for('registration.my_registrations') }}" class="nav-link">我的報名</a>
+                
+                {% if session.get('role') == 'admin' %}
+                    <a href="{{ url_for('event.new_event') }}" class="nav-link">新增活動</a>
+                {% endif %}
+                
+                <div style="width: 1px; height: 24px; background: var(--border-color); margin: 0 10px;"></div>
+                <span class="nav-link" style="color: var(--text-main); font-weight: 600;">{{ session.get('username') }}</span>
+                <a href="{{ url_for('auth.logout') }}" class="btn-nav" style="border: 1px solid var(--border-color); color: var(--text-main);">登出</a>
+            {% else %}
+                <a href="{{ url_for('auth.login') }}" class="btn-nav" style="color: var(--text-main);">登入</a>
+                <a href="{{ url_for('auth.register') }}" class="btn-nav btn-nav-primary">免費註冊</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- Flash 訊息區塊 -->
+        <div class="flash-messages">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <!-- 網頁主要內容 -->
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 EventHub 活動報名系統. All rights reserved.</p>
+    </footer>
+</body>
+</html>

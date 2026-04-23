@@ -46,6 +46,41 @@ def create(data: dict) -> int | None:
         conn.close()
 
 
+def check_time_conflict(user_id: int, new_start_time: str, new_end_time: str) -> bool:
+    """
+    檢查指定使用者的新活動時間，是否與已報名成功的活動時間重疊。
+    重疊條件：已報名開始時間 < 新活動結束時間 AND 已報名結束時間 > 新活動開始時間。
+
+    Args:
+        user_id (int): 使用者 ID。
+        new_start_time (str): 新活動的開始時間。
+        new_end_time (str): 新活動的結束時間。
+
+    Returns:
+        bool: 若有衝堂則回傳 True，否則回傳 False。
+    """
+    sql = """
+        SELECT 1
+        FROM registrations r
+        JOIN events e ON r.event_id = e.id
+        WHERE r.user_id = ?
+          AND r.status = 'success'
+          AND e.start_time < ?
+          AND e.end_time > ?
+        LIMIT 1
+    """
+    try:
+        conn = get_db_connection()
+        row = conn.execute(sql, (user_id, new_end_time, new_start_time)).fetchone()
+        return row is not None
+    except sqlite3.Error as e:
+        print(f"[Registration.check_time_conflict] Error: {e}")
+        # 若資料庫查詢失敗，為保證使用者體驗，先暫不阻擋
+        return False
+    finally:
+        conn.close()
+
+
 def get_all() -> list:
     """
     取得所有報名記錄。

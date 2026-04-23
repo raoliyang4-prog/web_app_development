@@ -49,17 +49,25 @@ def create(data: dict) -> int | None:
         conn.close()
 
 
-def get_all() -> list:
+def get_all(keyword: str = None) -> list:
     """
-    取得所有活動記錄，依建立時間降序排列。
+    取得所有活動記錄，依建立時間降序排列。支援關鍵字搜尋。
+
+    Args:
+        keyword (str, optional): 搜尋關鍵字。預設為 None。
 
     Returns:
         list[sqlite3.Row]: 所有活動列表，失敗時回傳空列表。
     """
-    sql = "SELECT * FROM events ORDER BY created_at DESC"
     try:
         conn = get_db_connection()
-        rows = conn.execute(sql).fetchall()
+        if keyword:
+            sql = "SELECT * FROM events WHERE title LIKE ? OR description LIKE ? ORDER BY created_at DESC"
+            search_term = f"%{keyword}%"
+            rows = conn.execute(sql, (search_term, search_term)).fetchall()
+        else:
+            sql = "SELECT * FROM events ORDER BY created_at DESC"
+            rows = conn.execute(sql).fetchall()
         return rows
     except sqlite3.Error as e:
         print(f"[Event.get_all] Error: {e}")

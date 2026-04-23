@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}我的報名紀錄 - EventHub{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>我的報名紀錄</h2>
+    <a href="{{ url_for('event.index') }}" class="btn btn-secondary">瀏覽更多活動</a>
+</div>
+
+{% if registrations %}
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>活動名稱</th>
+                <th>活動時間</th>
+                <th>報名狀態</th>
+                <th>報名時間</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for reg in registrations %}
+            <tr>
+                <td style="font-weight: 500; color: var(--text-main);">{{ reg.event_title }}</td>
+                <td>
+                    <div style="font-size: 0.85rem;">起：{{ reg.start_time }}</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">迄：{{ reg.end_time }}</div>
+                </td>
+                <td>
+                    {% if reg.status == 'success' %}
+                        <span class="badge badge-open">報名成功</span>
+                    {% else %}
+                        <span class="badge badge-full">{{ reg.status }}</span>
+                    {% endif %}
+                </td>
+                <td style="font-size: 0.85rem; color: var(--text-muted);">{{ reg.created_at }}</td>
+                <td>
+                    <a href="{{ url_for('event.detail', id=reg.event_id) }}" class="btn btn-secondary" style="padding: 0.3rem 0.75rem; font-size: 0.85rem;">檢視活動</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>您尚未報名任何活動</h3>
+    <p>快去活動列表看看有什麼感興趣的活動吧！</p>
+    <br>
+    <a href="{{ url_for('event.index') }}" class="btn btn-primary">瀏覽活動列表</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}報名名單：{{ event.title }} - EventHub{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{{ url_for('event.detail', id=event.id) }}" class="btn btn-secondary">← 返回活動</a>
+</div>
+
+<div style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: flex-end;">
+    <div>
+        <h2>{{ event.title }} - 報名名單</h2>
+        <p style="color: var(--text-muted); margin-top: 0.5rem;">
+            目前已報名：<strong>{{ event.current_capacity }}</strong> / {{ event.max_capacity }} 人
+        </p>
+    </div>
+    <a href="{{ url_for('registration.export_registrations', id=event.id) }}" class="btn btn-primary" style="padding: 0.5rem 1rem;">
+        📥 匯出 CSV
+    </a>
+</div>
+
+{% if registrations %}
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>報名序號</th>
+                <th>使用者帳號</th>
+                <th>聯絡信箱</th>
+                <th>狀態</th>
+                <th>報名時間</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for reg in registrations %}
+            <tr>
+                <td style="font-family: monospace; color: var(--text-muted);">#{{ reg.id }}</td>
+                <td style="font-weight: 500;">{{ reg.username }}</td>
+                <td>{{ reg.email }}</td>
+                <td>
+                    {% if reg.status == 'success' %}
+                        <span class="badge badge-open">報名成功</span>
+                    {% else %}
+                        <span class="badge badge-full">{{ reg.status }}</span>
+                    {% endif %}
+                </td>
+                <td style="font-size: 0.85rem; color: var(--text-muted);">{{ reg.created_at }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>目前還沒有人報名此活動</h3>
+</div>
+{% endif %}
+{% endblock %}
